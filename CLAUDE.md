@@ -110,7 +110,7 @@ daily_report_bot/
 ```bash
 NOTION_TOKEN=secret_xxxxx
 NOTION_DATABASE_ID=xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-OPENAI_API_KEY=sk-xxxxx
+GEMINI_API_KEY=xxxxx
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxxxx
 ```
 
