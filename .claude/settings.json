@@ -1,0 +1,24 @@
+{
+  "skills": [
+    {
+      "name": "drb:generate",
+      "description": "日報生成を実行する。当日または指定日付の日報をNotionに出力",
+      "path": "skills/daily-report-workflow.md"
+    },
+    {
+      "name": "drb:status",
+      "description": "ロガー状態と本日のログ件数を確認",
+      "path": "skills/daily-report-workflow.md"
+    },
+    {
+      "name": "drb:setup",
+      "description": "初期セットアップを実行（依存関係、環境変数、タスクスケジューラ）",
+      "path": "skills/daily-report-workflow.md"
+    },
+    {
+      "name": "drb:test",
+      "description": "各コンポーネント（ロガー、集計、LLM、Notion）をテスト",
+      "path": "skills/daily-report-workflow.md"
+    }
+  ]
+}
