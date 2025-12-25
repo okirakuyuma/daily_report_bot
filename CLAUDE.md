@@ -26,42 +26,43 @@ Windows向けPC作業自動記録・日報生成システム
 |------|------|
 | 目的 | PC作業を自動記録し、日報をNotionに出力 |
 | 対象OS | Windows 10/11 |
-| 主要言語 | PowerShell (ロガー), Python (生成) |
+| 主要言語 | Python 3.10+ |
+| アーキテクチャ | 軽量DDD（4レイヤー） |
 
 ```
 daily_report_bot/
 ├── docs/                      # 仕様書
-│   ├── architecture/         # アーキテクチャ
-│   ├── design/               # フロー設計
-│   └── phases/               # フェーズ仕様
-├── logger/                    # 常駐ロガー (PowerShell)
-├── generator/                 # 日報生成 (Python)
-├── shared/                    # 共通モジュール
+├── src/
+│   ├── domain/               # エンティティ・ビジネスルール
+│   ├── services/             # ユースケース・ロジック
+│   ├── repositories/         # データ永続化
+│   ├── gateways/             # 外部API連携
+│   ├── utils/                # 共通ユーティリティ
+│   └── main.py
 ├── scripts/                   # セットアップスクリプト
-└── tests/                     # テスト
+└── data/                      # ランタイムデータ
 ```
 
 ---
 
 ## スキル一覧
 
-### プロジェクトスキル
+### Claudeスキル（.claude/skills/）
+
+| スキル | 説明 | 詳細参照 |
+|--------|------|----------|
+| `drb-architecture.md` | 軽量DDDアーキテクチャ・コード配置ルール | - |
+| `notion/` | Notion APIでページ・DB・ブロック操作 | `references/` |
+| `llm/` | Gemini APIで構造化JSON出力 | `references/` |
+| `windows/` | Win32 API, OCR, Toast, Screenshot | `references/` |
+
+### プロジェクトコマンド
 
 | コマンド | 説明 |
 |----------|------|
 | `/drb:generate` | 日報生成を実行 |
 | `/drb:status` | ロガー状態確認 |
 | `/drb:setup` | 初期セットアップ |
-| `/drb:test` | コンポーネントテスト |
-
-### 技術スキル
-
-| スキル | 用途 |
-|--------|------|
-| windows-automation | PowerShell, Win32 API, OCR, タスクスケジューラ |
-| notion-integration | Notion API, ブロック生成 |
-| llm-integration | OpenAI API, プロンプト設計 |
-| daily-report-workflow | ワークフロー統括 |
 
 ---
 
@@ -164,7 +165,6 @@ await post_success_slack(report_url)
 
 ## 参照ドキュメント
 
-- [仕様書トップ](docs/README.md)
 - [アーキテクチャ概要](docs/architecture/overview.md)
+- [フォルダ構成](docs/architecture/folder-structure.md)
 - [Phase 1 MVP仕様](docs/phases/phase1-mvp.md)
-- [データスキーマ](docs/api/data-schema.md)
