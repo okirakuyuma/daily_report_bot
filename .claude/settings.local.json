@@ -10,7 +10,15 @@
       "mcp__playwright__browser_close",
       "mcp__serena__list_dir",
       "mcp__serena__activate_project",
-      "Skill(example-skills:skill-creator)"
+      "Skill(example-skills:skill-creator)",
+      "Bash(git worktree:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(python:*)",
+      "Bash(du:*)",
+      "Bash(python3:*)",
+      "Bash(pwsh -Command \"try { . ./scripts/logger.ps1 -WhatIf 2>&1 } catch { $_Exception.Message }\")",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: PowerShell常駐ロガーとタスクスケジューラ設定を実装\n\n- logger.ps1: 2分間隔でウィンドウ情報・OCR・特徴量抽出を実行\n  - Win32 API \\(GetForegroundWindow, GetWindowText, GetWindowThreadProcessId\\)\n  - WinRT OCRによるテキスト抽出\n  - 正規表現による特徴量抽出（キーワード、URL、ファイル、数値）\n  - JSONL形式でUTF-8 BOMなし出力\n  - ログローテーション（30日保持）\n  - プライバシー保護（除外プロセス・ウィンドウタイトル設定）\n\n- register_task.ps1: タスクスケジューラ登録・解除・状態確認\n  - ログオン時自動起動\n  - 非管理者権限での実行\n  - 自動再起動（3回、1分間隔）\n\ndocs/design/01-logger-flow.md の仕様に準拠\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

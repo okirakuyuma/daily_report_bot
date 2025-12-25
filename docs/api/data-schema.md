@@ -208,7 +208,7 @@ interface AppUsage {
   "meta": {
     "date": "2025-01-15",
     "generated_at": "2025-01-15T18:05:00+09:00",
-    "llm_model": "gpt-4o-mini",
+    "llm_model": "gemini-2.5-flash",
     "llm_success": true
   },
   "main_tasks": [
@@ -283,8 +283,8 @@ interface Settings {
   };
 
   llm: {
-    provider: "openai";
-    model: string;                  // デフォルト: "gpt-4o-mini"
+    provider: "gemini";
+    model: string;                  // デフォルト: "gemini-2.5-flash"
     max_tokens: number;             // デフォルト: 1000
     temperature: number;            // デフォルト: 0.3
     timeout_sec: number;            // デフォルト: 30
@@ -332,8 +332,8 @@ interface MaskPattern {
     "min_captures_for_report": 5
   },
   "llm": {
-    "provider": "openai",
-    "model": "gpt-4o-mini",
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
     "max_tokens": 1000,
     "temperature": 0.3,
     "timeout_sec": 30,

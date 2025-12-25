@@ -357,3 +357,52 @@ def filter_recent_records(
 - [ ] 全て同一アプリ
 - [ ] キーワード/URL/ファイルが全て空
 - [ ] 日本語ウィンドウタイトル
+
+## 9. アーキテクチャ配置
+
+軽量DDD（4レイヤー）に基づく配置:
+
+```
+src/
+├── domain/
+│   ├── capture.py         # CaptureRecord エンティティ
+│   ├── session.py         # Session エンティティ (Phase 2)
+│   └── features.py        # Features 値オブジェクト
+│
+├── services/
+│   └── aggregator.py      # LogAggregationService (本ファイルの実装)
+│
+├── repositories/
+│   └── log_repository.py  # JSONL読み書き
+│
+└── utils/
+    ├── time_utils.py      # 時間計算ヘルパー
+    └── text_utils.py      # キーワード抽出ヘルパー
+```
+
+### 依存関係
+
+```
+services/aggregator.py
+    ↓
+repositories/log_repository.py + utils/*
+    ↓
+domain/*
+```
+
+## 10. Phase別実装予定
+
+| Phase | 集計処理の変更 |
+|-------|--------------|
+| 1 MVP | 基本集計（セッション化なし、プロセス名はウィンドウタイトルから推定） |
+| 2 安定運用 | セッション化・時間ブロック・プロセス名取得追加 |
+| 3 LLM導入 | 変更なし（LLM要約フローで対応） |
+| 4 高精度化 | キーワード抽出精度向上、InsightCandidate追加 |
+| 5 プロダクト化 | プライバシーマスキング、監査ログ連携 |
+
+## 11. 関連ドキュメント
+
+- [01-logger-flow.md](01-logger-flow.md) - 常駐ロガー設計
+- [03-llm-flow.md](03-llm-flow.md) - LLM要約設計
+- [04-notion-flow.md](04-notion-flow.md) - Notion出力設計
+- [data-schema.md](../api/data-schema.md) - データスキーマ定義
