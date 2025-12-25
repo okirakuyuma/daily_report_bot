@@ -4,7 +4,7 @@ Daily Report Botの共通ユーティリティモジュール。
 
 ## 概要
 
-`src/utils/` には、時間計算とテキスト処理の汎用ヘルパー関数が含まれています。
+`src/utils/` には、時間計算、テキスト処理、Notionブロック生成の汎用ヘルパー関数が含まれています。
 
 ## モジュール構成
 
@@ -12,7 +12,268 @@ Daily Report Botの共通ユーティリティモジュール。
 src/utils/
 ├── __init__.py         # エクスポート定義
 ├── time_utils.py       # 時間計算ヘルパー
-└── text_utils.py       # テキスト処理ヘルパー
+├── text_utils.py       # テキスト処理ヘルパー
+└── block_builder.py    # Notionブロック生成ヘルパー
+```
+
+---
+
+## block_builder - Notionブロック生成ヘルパー
+
+日報データからNotion APIのブロック構造を生成。
+
+### 基本ブロック生成関数
+
+#### `heading_2(text: str) -> dict[str, Any]`
+
+見出し2ブロックを生成。
+
+**引数:**
+- `text` (str): 見出しテキスト
+
+**戻り値:**
+- `dict`: Notion APIのheading_2ブロック
+
+**使用例:**
+```python
+from src.utils.block_builder import heading_2
+
+block = heading_2("📊 基本情報")
+# -> {"type": "heading_2", "heading_2": {"rich_text": [...]}}
+```
+
+---
+
+#### `paragraph(text: str) -> dict[str, Any]`
+
+段落ブロックを生成。改行を含むテキストにも対応。
+
+**引数:**
+- `text` (str): 段落テキスト（改行含む可）
+
+**戻り値:**
+- `dict`: Notion APIのparagraphブロック
+
+**使用例:**
+```python
+from src.utils.block_builder import paragraph
+
+block = paragraph("記録期間: 09:00 〜 18:00\nキャプチャ数: 240回")
+# -> {"type": "paragraph", "paragraph": {"rich_text": [...]}}
+```
+
+---
+
+#### `numbered_list_item(text: str) -> dict[str, Any]`
+
+番号付きリストアイテムを生成。
+
+**引数:**
+- `text` (str): リストアイテムテキスト
+
+**戻り値:**
+- `dict`: Notion APIのnumbered_list_itemブロック
+
+**使用例:**
+```python
+from src.utils.block_builder import numbered_list_item
+
+block = numbered_list_item("データ集計処理を実装")
+# -> {"type": "numbered_list_item", ...}
+```
+
+---
+
+#### `bulleted_list_item(text: str) -> dict[str, Any]`
+
+箇条書きリストアイテムを生成。
+
+**引数:**
+- `text` (str): リストアイテムテキスト
+
+**戻り値:**
+- `dict`: Notion APIのbulleted_list_itemブロック
+
+**使用例:**
+```python
+from src.utils.block_builder import bulleted_list_item
+
+block = bulleted_list_item("[技術] Pydanticの型検証が便利")
+# -> {"type": "bulleted_list_item", ...}
+```
+
+---
+
+#### `divider() -> dict[str, Any]`
+
+区切り線ブロックを生成。
+
+**戻り値:**
+- `dict`: Notion APIのdividerブロック
+
+**使用例:**
+```python
+from src.utils.block_builder import divider
+
+block = divider()
+# -> {"type": "divider", "divider": {}}
+```
+
+---
+
+### テーブル生成関数
+
+#### `build_app_table(app_usage: list[AppUsage]) -> dict[str, Any]`
+
+アプリ使用状況テーブルを生成。
+
+**引数:**
+- `app_usage` (list[AppUsage]): AppUsageオブジェクトのリスト
+
+**戻り値:**
+- `dict`: Notion API形式のtableブロック（4列: アプリ | 時間 | 頻度 | 主な用途）
+
+**使用例:**
+```python
+from src.domain.report import AppUsage
+from src.utils.block_builder import build_app_table
+
+apps = [
+    AppUsage(name="VS Code", duration_min=120, rank="high", purpose="開発"),
+    AppUsage(name="Chrome", duration_min=60, rank="medium", purpose="調査")
+]
+
+table = build_app_table(apps)
+# -> {"type": "table", "table": {"table_width": 4, "children": [...]}}
+```
+
+---
+
+#### `rank_to_emoji(rank: str) -> str`
+
+使用頻度ランクを絵文字表記に変換。
+
+**引数:**
+- `rank` (str): ランク値 ("high", "medium", "low")
+
+**戻り値:**
+- `str`: 絵文字付きランク表記
+
+**ランクマッピング:**
+
+| ランク | 出力 |
+|--------|------|
+| high | 🔴 多 |
+| medium | 🟡 中 |
+| low | 🟢 少 |
+| その他 | - |
+
+**使用例:**
+```python
+from src.utils.block_builder import rank_to_emoji
+
+emoji = rank_to_emoji("high")  # -> "🔴 多"
+```
+
+---
+
+### レポート全体のブロック生成
+
+#### `build_report_blocks(report: Report | dict[str, Any]) -> list[dict[str, Any]]`
+
+日報レポートから完全な本文ブロックを生成（統合インターフェース）。
+
+**引数:**
+- `report` (Report | dict): Reportエンティティまたは辞書形式のレポート
+
+**戻り値:**
+- `list[dict]`: Notion APIブロックのリスト
+
+**生成されるブロック構造:**
+```
+📊 基本情報
+  - 作業サマリー
+  - 生成日時
+  - LLMエラー（失敗時）
+
+🎯 本日のメイン作業
+  - 番号付きリスト（タスクタイトル）
+  - 段落（タスク詳細）
+
+💡 知見・メモ
+  - 箇条書きリスト（[カテゴリ] 内容）
+
+📱 アプリ使用状況
+  - テーブル（アプリ | 時間 | 頻度 | 主な用途）
+
+📁 作業ファイル
+  - 箇条書きリスト（ファイル名）
+
+---
+🤖 Generated by Daily Report Bot
+```
+
+**使用例（Reportエンティティ）:**
+```python
+from src.domain.report import Report, ReportMeta, MainTask, Insight, AppUsage
+from src.utils.block_builder import build_report_blocks
+
+report = Report(
+    meta=ReportMeta(date="2025-01-15"),
+    main_tasks=[
+        MainTask(title="データ集計処理を実装", description="JSONL読み込みとセッション化を完成")
+    ],
+    insights=[
+        Insight(category="技術", content="Pydanticの型検証が便利")
+    ],
+    work_summary="日報生成システムの基盤機能を実装完了",
+    app_usage=[
+        AppUsage(name="VS Code", duration_min=180, rank="high", purpose="開発")
+    ],
+    files=["src/utils/block_builder.py"]
+)
+
+blocks = build_report_blocks(report)
+# -> [{"type": "heading_2", ...}, {"type": "paragraph", ...}, ...]
+```
+
+**使用例（辞書形式）:**
+```python
+report_dict = {
+    "meta": {"date": "2025-01-15", "generated_at": "2025-01-15T18:00:00"},
+    "main_tasks": [{"title": "タスク1", "description": "詳細1"}],
+    "insights": [{"category": "技術", "content": "知見1"}],
+    "work_summary": "作業完了",
+    "app_usage": [
+        {"name": "App1", "duration_min": 100, "rank": "high", "purpose": "目的1"}
+    ],
+    "files": ["file1.py"]
+}
+
+blocks = build_report_blocks(report_dict)
+```
+
+---
+
+### 空リスト対応
+
+各セクションで空リストの場合は以下のメッセージを表示:
+
+| セクション | メッセージ |
+|-----------|-----------|
+| メイン作業 | （メイン作業が記録されていません） |
+| 知見・メモ | （知見が記録されていません） |
+| アプリ使用状況 | （アプリ使用状況が記録されていません） |
+| 作業ファイル | （作業ファイルが検出されていません） |
+
+---
+
+### LLM失敗時の表示
+
+`meta.llm_success == False` の場合、基本情報セクションに警告を表示:
+
+```
+⚠️ LLM要約失敗: {エラーメッセージ}
 ```
 
 ---
@@ -270,6 +531,7 @@ from src.utils.text_utils import normalize_app_name, calculate_rank
 ## テスト
 
 ### テストファイル
+- `/home/okira/job/daily_report_bot/tests/utils/test_block_builder.py`
 - `/home/okira/job/daily_report_bot/tests/utils/test_time_utils.py`
 - `/home/okira/job/daily_report_bot/tests/utils/test_text_utils.py`
 
@@ -279,6 +541,7 @@ from src.utils.text_utils import normalize_app_name, calculate_rank
 pytest tests/utils/
 
 # 個別モジュールのテスト
+pytest tests/utils/test_block_builder.py
 pytest tests/utils/test_time_utils.py
 pytest tests/utils/test_text_utils.py
 

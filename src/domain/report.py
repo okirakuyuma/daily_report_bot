@@ -6,9 +6,11 @@ LLM要約結果とルールベース処理結果を統合した日報データ�
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from enum import Enum
 
 from pydantic import BaseModel, Field
+
+from .features import AppRank
 
 
 class MainTask(BaseModel):
@@ -23,6 +25,14 @@ class MainTask(BaseModel):
     description: str = Field(description="具体的な成果・進捗")
 
 
+class InsightCategory(str, Enum):
+    """知見カテゴリ."""
+
+    TECHNICAL = "技術"  # 技術的な知見・学び
+    PROCESS = "プロセス"  # 作業プロセスの改善点
+    OTHER = "その他"  # その他のメモ
+
+
 class Insight(BaseModel):
     """知見・メモ
 
@@ -31,8 +41,8 @@ class Insight(BaseModel):
         content: 知見の内容
     """
 
-    category: Literal["技術", "プロセス", "その他"]
-    content: str = Field(description="知見の内容")
+    category: InsightCategory = Field(description="知見カテゴリ")
+    content: str = Field(description="知見の内容", min_length=1)
 
 
 class AppUsage(BaseModel):
@@ -45,10 +55,10 @@ class AppUsage(BaseModel):
         purpose: 用途（オプション）
     """
 
-    name: str
-    duration_min: int
-    rank: Literal["high", "medium", "low"]
-    purpose: str | None = None
+    name: str = Field(description="アプリケーション名", min_length=1)
+    duration_min: int = Field(description="使用時間（分）", ge=0)
+    rank: AppRank = Field(description="使用頻度ランク")
+    purpose: str | None = Field(default=None, description="用途の説明")
 
 
 class LLMSummary(BaseModel):

@@ -8,88 +8,73 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Protocol
 
 from src.domain.features import Features
 from src.domain.report import AppUsage as ReportAppUsage
-from src.domain.report import Report, ReportMeta
+from src.domain.report import LLMSummary, Report, ReportMeta
 
 logger = logging.getLogger(__name__)
 
 
-# システムプロンプト定義
-SYSTEM_PROMPT = """あなたはPC作業ログから日報を生成するアシスタントです。
-
-## 出力ルール
-
-1. **本日のメイン作業** (最大3件)
-   - 作業時間・重要度を考慮して選定
-   - 具体的な成果物や進捗を含める
-   - 「〜を実装した」「〜を調査した」など動詞で終わる
-
-2. **知見・メモ**
-   - 技術的な発見、学び、注意点を抽出
-   - カテゴリ: 技術 / プロセス / その他
-
-3. **作業サマリー**
-   - 1文で本日の作業を要約
-
-## 注意事項
-- 推測で情報を補完しない
-- 入力データにない内容は書かない
-- 簡潔で読みやすい日本語で記述
-"""
+# 定数定義
+MAX_TIME_BLOCKS = 8
+MAX_APP_SUMMARY = 5
+MAX_KEYWORDS = 10
 
 
-def _build_user_prompt(features: Features) -> str:
-    """ユーザープロンプトを構築
+class GeminiClientProtocol(Protocol):
+    """GeminiClient のインターフェース定義（型安全性確保）"""
+
+    model_name: str
+
+    def generate_summary(self, features: dict) -> LLMSummary:
+        """features dict から LLMSummary を生成"""
+        ...
+
+
+def _convert_features_to_dict(features: Features) -> dict:
+    """Features を dict に変換（GeminiGateway のインターフェースに合わせる）
 
     Args:
         features: 集計済み特徴量
 
     Returns:
-        ユーザープロンプト文字列
+        features dict（gemini.py の generate_summary() に渡す形式）
     """
-    meta = features.meta
-
-    # 時間帯別作業（上位8件）
-    time_blocks_lines = []
-    for block in features.time_blocks[:8]:
-        app_names = [app.name for app in block.apps[:2]]
-        apps_str = ", ".join(app_names)
-        time_blocks_lines.append(f"- {block.start}〜{block.end}: {apps_str}")
-    time_blocks_text = (
-        "\n".join(time_blocks_lines) if time_blocks_lines else "（データなし）"
-    )
-
-    # アプリ使用状況（上位5件）
-    app_lines = []
-    for app in features.app_summary[:5]:
-        app_lines.append(f"- {app.name}: {app.duration_min}分 ({app.rank.value})")
-    app_text = "\n".join(app_lines) if app_lines else "（データなし）"
-
-    # 主なキーワード（上位10件）
-    keywords_text = ", ".join(features.global_keywords.top_keywords[:10])
-    if not keywords_text:
-        keywords_text = "（データなし）"
-
-    return f"""以下は本日の作業ログの要約です。日報を作成してください。
-
-## 基本情報
-- 日付: {meta.date}
-- 記録期間: {meta.first_capture} 〜 {meta.last_capture}
-- キャプチャ数: {meta.capture_count}回
-- 総作業時間: {meta.total_duration_min}分
-
-## 時間帯別作業
-{time_blocks_text}
-
-## アプリ使用状況
-{app_text}
-
-## 主なキーワード
-{keywords_text}
-"""
+    return {
+        "meta": {
+            "date": features.meta.date,
+            "generated_at": features.meta.generated_at,
+            "capture_count": features.meta.capture_count,
+            "first_capture": features.meta.first_capture,
+            "last_capture": features.meta.last_capture,
+            "total_duration_min": features.meta.total_duration_min,
+        },
+        "time_blocks": [
+            {
+                "start": block.start,
+                "end": block.end,
+                "apps": [{"name": app.name, "percent": app.percent} for app in block.apps],
+            }
+            for block in features.time_blocks
+        ],
+        "app_summary": [
+            {
+                "name": app.name,
+                "process": app.process,
+                "count": app.count,
+                "duration_min": app.duration_min,
+                "rank": app.rank.value,
+            }
+            for app in features.app_summary
+        ],
+        "global_keywords": {
+            "top_keywords": features.global_keywords.top_keywords,
+            "top_urls": features.global_keywords.top_urls,
+            "top_files": features.global_keywords.top_files,
+        },
+    }
 
 
 def _convert_features_to_app_usage(features: Features) -> list[ReportAppUsage]:
@@ -119,7 +104,7 @@ class SummarizerService:
     失敗時はフォールバックレポートを返す。
     """
 
-    def __init__(self, gemini_client: Any | None = None) -> None:
+    def __init__(self, gemini_client: GeminiClientProtocol | None = None) -> None:
         """初期化
 
         Args:
@@ -147,15 +132,13 @@ class SummarizerService:
             if self.gemini_client is None:
                 raise ValueError("GeminiClient が設定されていません")
 
-            # プロンプト構築
-            user_prompt = _build_user_prompt(features)
-            full_prompt = f"{SYSTEM_PROMPT}\n\n{user_prompt}"
+            # Features を dict に変換してGeminiGateway に渡す
+            features_dict = _convert_features_to_dict(features)
 
             logger.debug("LLM呼び出し開始")
-            logger.debug(f"プロンプト長: {len(full_prompt)} 文字")
 
-            # GeminiClient を使用してLLM呼び出し
-            llm_summary = self.gemini_client.generate_summary(full_prompt)
+            # GeminiGateway がプロンプト構築からLLM呼び出しまで完結
+            llm_summary = self.gemini_client.generate_summary(features_dict)
 
             logger.info("LLM要約成功")
 
@@ -163,9 +146,7 @@ class SummarizerService:
             meta = ReportMeta(
                 date=features.meta.date,
                 generated_at=datetime.now(),
-                llm_model=self.gemini_client.model_name
-                if hasattr(self.gemini_client, "model_name")
-                else "gemini-2.5-flash",
+                llm_model=self.gemini_client.model_name,
                 llm_success=True,
             )
 
@@ -202,7 +183,9 @@ class SummarizerService:
 
 
 # 便利関数: クライアントなしでも動作するデフォルトインスタンス生成
-def create_summarizer(gemini_client: Any | None = None) -> SummarizerService:
+def create_summarizer(
+    gemini_client: GeminiClientProtocol | None = None,
+) -> SummarizerService:
     """SummarizerService インスタンスを生成
 
     Args:

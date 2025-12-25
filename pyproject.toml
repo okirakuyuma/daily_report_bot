@@ -29,7 +29,7 @@ windows = [
     "pywin32>=306",
     "Pillow>=10.0.0",
     "winocr>=0.0.2",
-    "win10toast>=0.9",
+    "win10toast-click>=0.1.0",
 ]
 # Development
 dev = [

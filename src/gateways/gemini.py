@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import threading
 from typing import Any
 
 from google import genai
@@ -82,6 +83,9 @@ class GeminiGateway:
         self.retry_delay_sec = retry_delay_sec
         self.client = genai.Client(api_key=self.api_key)
 
+        # セキュリティ: 初期化後はAPIキーをメモリから削除
+        self.api_key = None
+
     def generate_summary(self, features: dict[str, Any]) -> LLMSummary:
         """作業ログから日報サマリーを生成
 
@@ -102,16 +106,8 @@ class GeminiGateway:
         last_error = None
         for attempt in range(self.retry_count + 1):
             try:
-                response = self.client.models.generate_content(
-                    model=self.model,
-                    contents=full_prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_json_schema=schema,
-                        temperature=0.3,
-                        max_output_tokens=1000,
-                    ),
-                )
+                # タイムアウト付きAPI呼び出し
+                response = self._call_api_with_timeout(full_prompt, schema)
 
                 # レスポンスをパース
                 summary = LLMSummary.model_validate_json(response.text)
@@ -125,6 +121,53 @@ class GeminiGateway:
 
         # 全リトライ失敗
         raise Exception(f"Gemini API call failed after {self.retry_count + 1} attempts: {last_error}")
+
+    def _call_api_with_timeout(self, prompt: str, schema: dict[str, Any]) -> Any:
+        """タイムアウト付きでAPI呼び出し
+
+        Args:
+            prompt: プロンプト文字列
+            schema: JSONスキーマ
+
+        Returns:
+            API レスポンス
+
+        Raises:
+            TimeoutError: タイムアウト時
+            Exception: その他のエラー
+        """
+        result = [None]
+        exception = [None]
+
+        def target():
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_json_schema=schema,
+                        temperature=0.3,
+                        max_output_tokens=1000,
+                    ),
+                )
+                result[0] = response
+            except Exception as e:
+                exception[0] = e
+
+        thread = threading.Thread(target=target)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=self.timeout_sec)
+
+        if thread.is_alive():
+            # タイムアウト発生
+            raise TimeoutError(f"API call timed out after {self.timeout_sec} seconds")
+
+        if exception[0]:
+            raise exception[0]
+
+        return result[0]
 
     def _build_user_prompt(self, features: dict[str, Any]) -> str:
         """ユーザープロンプトを構築
